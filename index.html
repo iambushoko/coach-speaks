@@ -114,6 +114,7 @@
         }
 
         /* Toast Notification */
+        /* Toast Notification */
         .toast {
             position: fixed;
             bottom: 6rem;
@@ -126,14 +127,19 @@
             padding: 0.75rem 1.5rem;
             border-radius: 9999px;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 100;
             white-space: nowrap;
             font-weight: 500;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
         }
 
         .toast.active {
             transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            visibility: visible;
         }
 
         /* Improved Touch Targets */
@@ -143,6 +149,9 @@
             touch-action: manipulation;
         }
     </style>
+
+
+
 
     <!-- PWA Manifest & Icons -->
     <link rel="manifest"
@@ -380,6 +389,7 @@
         let data = [];
         let currentCategory = '全部';
         let searchQuery = '';
+        let toastTimeout;
 
         async function init() {
             // Load categories
@@ -504,21 +514,21 @@
 
                 if (isCategoryEditMode && !isAll && !isTrash) {
                     return `
-                        <div class="relative group">
-                            <button onclick="filterCategory('${category}')" class="px-4 py-2 rounded-full font-medium transition-all ${btnClass}">
-                                ${category}
-                            </button>
-                            <button onclick="deleteCategory('${category}')" class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-sm font-bold transition-colors shadow-md z-10 border-2 border-white">
-                                ×
-                            </button>
-                        </div>
-                    `;
+                                <div class="relative group">
+                                    <button onclick="filterCategory('${category}')" class="px-4 py-2 rounded-full font-medium transition-all ${btnClass}">
+                                        ${category}
+                                    </button>
+                                    <button onclick="deleteCategory('${category}')" class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-sm font-bold transition-colors shadow-md z-10 border-2 border-white">
+                                        ×
+                                    </button>
+                                </div>
+                                `;
                 } else {
                     return `
-                        <button onclick="filterCategory('${category}')" class="px-4 py-2 rounded-full font-medium transition-all ${btnClass}">
-                            ${category}
-                        </button>
-                    `;
+                                <button onclick="filterCategory('${category}')" class="px-4 py-2 rounded-full font-medium transition-all ${btnClass}">
+                                    ${category}
+                                </button>
+                                `;
                 }
             }).join('');
 
@@ -585,26 +595,26 @@
                 const cursorClass = isDeleted ? '' : 'cursor-pointer active:scale-[0.99]';
 
                 return `
-                    <div class="bg-white rounded-xl shadow-md overflow-hidden border-2 border-slate-200 hover:shadow-lg transition-all relative group flex flex-col h-full ${cursorClass}" ${cardClickAttr}>
-                        <div class="bg-gradient-to-r ${gradient} p-4 pr-14 relative">
-                            <div class="flex items-center justify-between mb-1">
-                                <div class="flex-1">
-                                    <h3 class="text-xl font-bold text-white break-words pr-2">${item.actionName}</h3>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Action Menu (Top Right) -->
-                        <div class="absolute top-4 right-3 z-20">
-                            <div class="relative group">
-                                <button onclick="toggleMenu(this, event)" class="p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-white transition-colors backdrop-blur-sm">
-                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
-                                    </svg>
-                                </button>
-                                <!-- Dropdown -->
-                                <div class="dropdown-menu w-44 py-2 font-medium z-30 shadow-xl rounded-xl">
-                                    ${isDeleted ? `
+                                <div class="bg-white rounded-xl shadow-md overflow-hidden border-2 border-slate-200 hover:shadow-lg transition-all relative group flex flex-col h-full ${cursorClass}" ${cardClickAttr}>
+                                    <div class="bg-gradient-to-r ${gradient} p-4 pr-14 relative">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <div class="flex-1">
+                                                <h3 class="text-xl font-bold text-white break-words pr-2">${item.actionName}</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Menu (Top Right) -->
+                                    <div class="absolute top-4 right-3 z-20">
+                                        <div class="relative group">
+                                            <button onclick="toggleMenu(this, event)" class="p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-white transition-colors backdrop-blur-sm">
+                                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+                                                </svg>
+                                            </button>
+                                            <!-- Dropdown -->
+                                            <div class="dropdown-menu w-44 py-2 font-medium z-30 shadow-xl rounded-xl">
+                                                ${isDeleted ? `
                                         <button onclick="restoreEntry(${item.id})" class="block w-full text-left px-4 py-3 text-base text-slate-700 hover:bg-slate-100 flex items-center gap-3">
                                             <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
                                             還原此卡片
@@ -623,36 +633,36 @@
                                             刪除
                                         </button>
                                     `}
-                                </div>
-                            </div>
-                        </div>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                        <div class="p-4 space-y-4 flex-1 flex flex-col">
-                            <div class="flex items-center">
-                                <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-bold border border-slate-200">
-                                    ${item.category}
-                                </span>
-                            </div>
-                            
-                            <div class="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-100 pointer-events-none">
-                                <div class="text-sm text-slate-700 grid grid-cols-1 gap-1">
-                                    <p><span class="font-semibold text-slate-400">方向：</span> ${item.direction}</p>
-                                    <p><span class="font-semibold text-slate-400">距離：</span> ${item.distance}</p>
-                                    <p><span class="font-semibold text-slate-400">描述：</span> ${item.description}</p>
-                                </div>
-                            </div>
+                                    <div class="p-4 space-y-4 flex-1 flex flex-col">
+                                        <div class="flex items-center">
+                                            <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-bold border border-slate-200">
+                                                ${item.category}
+                                            </span>
+                                        </div>
 
-                            <div class="pt-2 border-t border-slate-100 flex justify-between items-start gap-3 mt-auto">
-                                <p class="text-lg text-slate-800 leading-relaxed font-medium flex-1 select-none" id="cue-${item.id}">${item.cue}</p>
-                                <button class="text-slate-400 hover:text-blue-500 transition-colors p-2 -mr-2" title="複製指令">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                                        <div class="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-100 pointer-events-none">
+                                            <div class="text-sm text-slate-700 grid grid-cols-1 gap-1">
+                                                <p><span class="font-semibold text-slate-400">方向：</span> ${item.direction}</p>
+                                                <p><span class="font-semibold text-slate-400">距離：</span> ${item.distance}</p>
+                                                <p><span class="font-semibold text-slate-400">描述：</span> ${item.description}</p>
+                                            </div>
+                                        </div>
+
+                                        <div class="pt-2 border-t border-slate-100 flex justify-between items-start gap-3 mt-auto">
+                                            <p class="text-lg text-slate-800 leading-relaxed font-medium flex-1 select-none" id="cue-${item.id}">${item.cue}</p>
+                                            <button class="text-slate-400 hover:text-blue-500 transition-colors p-2 -mr-2" title="複製指令">
+                                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                `;
             }).join('');
         }
 
@@ -803,8 +813,16 @@
         function copyCue(text) {
             navigator.clipboard.writeText(text).then(() => {
                 const toast = document.getElementById('toast');
+
+                if (toastTimeout) {
+                    clearTimeout(toastTimeout);
+                }
+
+                toast.classList.remove('active');
+                void toast.offsetWidth; // Trigger Reflow
                 toast.classList.add('active');
-                setTimeout(() => {
+
+                toastTimeout = setTimeout(() => {
                     toast.classList.remove('active');
                 }, 2000);
             }).catch(err => {
