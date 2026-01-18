@@ -353,7 +353,8 @@
         let isCategoryEditMode = false;
 
         // Initial Data
-        const initialData = [
+        // Fallback Data (Original Initial Data)
+        const fallbackData = [
             { id: 1, actionName: "深蹲", category: "下肢推", direction: "向下", distance: "地板", description: "踩碎", cue: "用腳跟踩碎腳下的地板", problem: "" },
             { id: 2, actionName: "前蹲", category: "下肢推", direction: "向下", distance: "地板", description: "壓碎", cue: "將地板壓碎，讓力量從腳跟向上噴射", problem: "" },
             { id: 3, actionName: "分腿蹲", category: "下肢推", direction: "向下", distance: "地板", description: "穿透", cue: "後腳向下穿透地板，前腳將地板推開", problem: "" },
@@ -380,7 +381,7 @@
         let currentCategory = '全部';
         let searchQuery = '';
 
-        function init() {
+        async function init() {
             // Load categories
             const savedCategories = localStorage.getItem('coachCategories');
             if (savedCategories) {
@@ -390,38 +391,8 @@
                 saveCategories();
             }
 
-            // Load data
-            const savedData = localStorage.getItem('coachCueDatabase');
-            if (savedData) {
-                data = JSON.parse(savedData);
-            } else {
-                data = [...initialData];
-                saveData();
-            }
-
-            // Migration: Fix "下肢鉸鏈" -> "下肢拉"
-            let migrationNeeded = false;
-
-            // Migrate Categories
-            if (categories.includes('下肢鉸鏈')) {
-                categories = categories.map(c => c === '下肢鉸鏈' ? '下肢拉' : c);
-                // Remove duplicates if any
-                categories = [...new Set(categories)];
-                migrationNeeded = true;
-            }
-
-            // Migrate Data
-            data.forEach(item => {
-                if (item.category === '下肢鉸鏈') {
-                    item.category = '下肢拉';
-                    migrationNeeded = true;
-                }
-            });
-
-            if (migrationNeeded) {
-                saveCategories();
-                saveData();
-            }
+            // Fetch and Load Data
+            await fetchAndMergeData();
 
             updateCategoryDropdown();
             renderCategoryFilters();
@@ -451,6 +422,63 @@
                     });
                 }
             });
+        }
+
+        async function fetchAndMergeData() {
+            let apiData = [];
+            const apiUrl = 'https://script.google.com/macros/s/AKfycbxrF6UYzxWrwetXzohz3me9rF-5KhVyuqIPw2OYDyDlWVyYeBSbVQiu_PEXDtguOAVE/exec';
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                apiData = await response.json();
+                console.log('API Data fetched successfully:', apiData);
+            } catch (error) {
+                console.error('API Fetch failed, using fallback data:', error);
+                apiData = [...fallbackData];
+            }
+
+            // LocalStorage Data (User created/modified items)
+            const savedDataStr = localStorage.getItem('coachCueDatabase');
+            let localData = savedDataStr ? JSON.parse(savedDataStr) : [];
+
+            // Merge Strategy:
+            // 1. Start with API data (or fallback)
+            // 2. Identify "custom" items from local storage. 
+            //    Assumption: Items with IDs present in fallbackData but NOT in API are "removed" by source? 
+            //    Simpler Strategy as per request: Merge API data with "existing local added data".
+            //    We will take all API items, and append any local items that have IDs NOT present in API data.
+            //    Also, we might want to respect local "deleted" status if we want to be fancy, but let's stick to basic merge first.
+
+            // Set of API IDs for quick lookup
+            const apiIds = new Set(apiData.map(item => item.id));
+
+            // Filter local data to find items NOT in API (likely user-added items)
+            const userAddedItems = localData.filter(item => !apiIds.has(item.id));
+
+            // Combine
+            data = [...apiData, ...userAddedItems];
+
+            // Migration Only for User Added Items if needed (or re-run on whole set just in case)
+            // Fix "下肢鉸鏈" -> "下肢拉"
+            let migrationNeeded = false;
+
+            // Check Categories migration
+            if (categories.includes('下肢鉸鏈')) {
+                categories = categories.map(c => c === '下肢鉸鏈' ? '下肢拉' : c);
+                categories = [...new Set(categories)];
+                saveCategories();
+            }
+
+            // Check Data migration
+            data.forEach(item => {
+                if (item.category === '下肢鉸鏈') {
+                    item.category = '下肢拉';
+                }
+            });
+
+            // Save merged state to localStorage so offline access works next time with latest data
+            saveData();
         }
 
         function renderCategoryFilters() {
