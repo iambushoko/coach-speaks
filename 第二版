@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#f8fafc">
+    <title>教練講白話：意象指令資料庫</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+
+        /* Prevent Text Selection on UI elements for app-like feel */
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-container {
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.active .modal-container {
+            transform: scale(1);
+        }
+
+        /* Floating Action Button */
+        .fab-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 9999px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 40;
+        }
+
+        .fab-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .fab-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Dropdown Menu */
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 0.5rem;
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            min-width: 9rem;
+            z-index: 30;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-menu.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 6rem;
+            /* Higher than FAB */
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(4px);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+            white-space: nowrap;
+            font-weight: 500;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .toast.active {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Improved Touch Targets */
+        button,
+        select,
+        input {
+            touch-action: manipulation;
+        }
+    </style>
+
+    <!-- PWA Manifest & Icons -->
+    <link rel="manifest"
+        href="data:application/manifest+json;base64,eyJuYW1lIjogIlx1NjU1OVx1N2RmNFx1OGIxYlx1NzY3ZFx1OGE3MVx1ZmYxYVx1NjEwZlx1OGM2MVx1NjMwN1x1NGVlNFx1OGNjN1x1NjU5OVx1NWVhYiIsICJzaG9ydF9uYW1lIjogIlx1NjU1OVx1N2RmNFx1NjMwN1x1NGVlNFx1NWVhYiIsICJzdGFydF91cmwiOiAiLiIsICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCAiYmFja2dyb3VuZF9jb2xvciI6ICIjZjhmYWZjIiwgInRoZW1lX2NvbG9yIjogIiMyNTYzZWIiLCAib3JpZW50YXRpb24iOiAicG9ydHJhaXQiLCAiaWNvbnMiOiBbeyJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sO2Jhc2U2NCxQSE4yWnlCNGJXeHVjejBpYUhSMGNEb3ZMM2QzZHk1M015NXZjbWN2TWpBd01DOXpkbWNpSUhacFpYZENiM2c5SWpBZ01DQTFNVElnTlRFeUlqNEtJQ0E4Y21WamRDQjNhV1IwYUQwaU5URXlJaUJvWldsbmFIUTlJalV4TWlJZ1ptbHNiRDBpSXpJMU5qTmxZaUl2UGdvZ0lEeDBaWGgwSUhnOUlqVXdKU0lnZVQwaU5UUWxJaUJrYjIxcGJtRnVkQzFpWVhObGJHbHVaVDBpYldsa1pHeGxJaUIwWlhoMExXRnVZMmh2Y2owaWJXbGtaR3hsSWlCbWIyNTBMV1poYldsc2VUMGljMkZ1Y3kxelpYSnBaaUlnWm05dWRDMTNaV2xuYUhROUltSnZiR1FpSUdadmJuUXRjMmw2WlQwaU1qZ3dJaUJtYVd4c1BTSjNhR2wwWlNJKzVwV1pQQzkwWlhoMFBnbzhMM04yWno0PSIsICJzaXplcyI6ICI1MTJ4NTEyIiwgInR5cGUiOiAiaW1hZ2Uvc3ZnK3htbCIsICJwdXJwb3NlIjogImFueSBtYXNrYWJsZSJ9XX0=">
+    <link rel="icon"
+        href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzI1NjNlYiIvPgogIDx0ZXh0IHg9IjUwJSIgeT0iNTQlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtc2l6ZT0iMjgwIiBmaWxsPSJ3aGl0ZSI+5pWZPC90ZXh0Pgo8L3N2Zz4="
+        type="image/svg+xml">
+    <link rel="apple-touch-icon"
+        href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzI1NjNlYiIvPgogIDx0ZXh0IHg9IjUwJSIgeT0iNTQlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtc2l6ZT0iMjgwIiBmaWxsPSJ3aGl0ZSI+5pWZPC90ZXh0Pgo8L3N2Zz4=">
+    <meta name="apple-mobile-web-app-title" content="教練指令庫">
+
+</head>
+
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen no-select">
+    <div class="container mx-auto px-4 py-6 max-w-7xl pb-24">
+        <!-- Header -->
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-5xl font-bold text-slate-800 mb-2">教練講白話：意象指令資料庫</h1>
+            <p class="text-slate-600 text-sm md:text-base">基於外部焦點（External Focus）理論的指令庫</p>
+        </header>
+
+        <!-- Search and Filter Section -->
+        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <!-- Add Button (Toolbar) -->
+            <button onclick="openModal('add')"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm flex items-center gap-1 active:scale-95 transform">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                新增指令
+            </button>
+
+            <div class="flex gap-2">
+                <button onclick="exportData()"
+                    class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium rounded-lg transition-colors border border-slate-200 active:bg-slate-300">
+                    匯出
+                </button>
+                <label
+                    class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium rounded-lg transition-colors border border-slate-200 cursor-pointer active:bg-slate-300">
+                    匯入
+                    <input type="file" id="importInput" accept=".json" class="hidden" onchange="importData(this)">
+                </label>
+            </div>
+        </div>
+
+        <div class="mb-6 space-y-4">
+            <!-- Search Bar -->
+            <div class="relative">
+                <input type="text" id="searchInput" placeholder="搜尋動作名稱..."
+                    class="w-full px-4 py-3 pl-12 rounded-xl border-2 border-slate-200 focus:border-blue-400 focus:outline-none transition-all shadow-sm text-base bg-white/80 backdrop-blur-sm">
+                <svg class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+
+            <!-- Category Filter Section -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-medium text-slate-700">分類篩選</h3>
+                    <button id="editCategoryBtn" onclick="toggleCategoryEditMode()"
+                        class="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-slate-200">
+                        <span id="editCategoryBtnText">編輯分類</span>
+                    </button>
+                </div>
+
+                <!-- Category Filter Chips -->
+                <div class="flex flex-wrap gap-2" id="categoryFilter">
+                    <!-- Categories will be dynamically generated -->
+                </div>
+
+                <!-- Add Category Form (only visible in edit mode) -->
+                <div id="addCategoryForm"
+                    class="hidden flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <input type="text" id="newCategoryInput" placeholder="輸入新分類名稱..."
+                        class="flex-1 px-3 py-2 rounded-lg border border-slate-300 focus:border-blue-400 focus:outline-none text-sm">
+                    <button onclick="addCategory()"
+                        class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-colors text-sm whitespace-nowrap">
+                        新增
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add New Entry Button (FAB) -->
+        <button onclick="openModal('add')" class="fab-btn md:hidden" title="新增指令">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+        </button>
+
+        <!-- Clear All Trash Button (Only visible in Trash view) -->
+        <div id="trashControls" class="hidden mb-4 flex justify-end">
+            <button onclick="permanentDeleteAll()"
+                class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shadow-sm flex items-center gap-2 active:bg-red-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                    </path>
+                </svg>
+                清空回收桶
+            </button>
+        </div>
+
+        <!-- Cards Grid -->
+        <div id="cardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Cards will be dynamically generated -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-slate-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-slate-500">找不到符合條件的指令</p>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="entryModal" class="modal-overlay p-4" onclick="handleModalClick(event)">
+        <div
+            class="modal-container bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-6 relative animate-fade-in-up flex flex-col max-h-[90vh]">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2 z-10">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+
+            <h2 id="modalTitle" class="text-2xl font-bold text-slate-800 mb-6 flex-shrink-0">新增指令</h2>
+
+            <form id="addForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto pr-1">
+                <input type="hidden" id="entryId">
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">動作名稱</label>
+                    <input type="text" id="actionName" required
+                        class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-400 focus:outline-none transition-colors text-lg"
+                        placeholder="例如：深蹲">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">類別</label>
+                    <select id="actionCategory" required
+                        class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-400 focus:outline-none bg-white text-lg">
+                        <option value="">選擇類別</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">方向</label>
+                    <input type="text" id="direction" required
+                        class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-400 focus:outline-none transition-colors"
+                        placeholder="力量前進的方向">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">距離</label>
+                    <input type="text" id="distance" required
+                        class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-400 focus:outline-none transition-colors"
+                        placeholder="參考點">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">描述</label>
+                    <input type="text" id="description" required
+                        class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-400 focus:outline-none transition-colors"
+                        placeholder="類比動詞">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">意象指令</label>
+                    <textarea id="cue" required rows="3"
+                        class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-400 focus:outline-none transition-colors text-lg"
+                        placeholder="完整的指導語..."></textarea>
+                </div>
+
+                <div class="md:col-span-2 pt-4 flex justify-end gap-3 mt-2 flex-shrink-0">
+                    <button type="button" onclick="closeModal()"
+                        class="px-6 py-3 text-slate-600 hover:bg-slate-100 font-medium rounded-xl transition-colors min-w-[5rem]">
+                        取消
+                    </button>
+                    <button type="submit"
+                        class="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors shadow-lg shadow-blue-500/30 min-w-[8rem]">
+                        儲存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast" class="toast">
+        複製成功！
+    </div>
+
+    <script>
+        // --- script.js Content Integration ---
+
+        // Default Categories
+        const defaultCategories = ['全部', '下肢推', '下肢拉', '上肢推', '上肢拉', '旋轉/抗旋轉'];
+
+        // State Management
+        let categories = [];
+        let isCategoryEditMode = false;
+
+        // Initial Data
+        // Fallback Data (Original Initial Data)
+        const fallbackData = [
+            { id: 1, actionName: "深蹲", category: "下肢推", direction: "向下", distance: "地板", description: "踩碎", cue: "用腳跟踩碎腳下的地板", problem: "" },
+            { id: 2, actionName: "前蹲", category: "下肢推", direction: "向下", distance: "地板", description: "壓碎", cue: "將地板壓碎，讓力量從腳跟向上噴射", problem: "" },
+            { id: 3, actionName: "分腿蹲", category: "下肢推", direction: "向下", distance: "地板", description: "穿透", cue: "後腳向下穿透地板，前腳將地板推開", problem: "" },
+            { id: 4, actionName: "硬舉", category: "下肢拉", direction: "向後", distance: "後方的牆", description: "推開", cue: "用臀部向後推開身後的牆", problem: "圓背" },
+            { id: 16, actionName: "硬舉", category: "下肢拉", direction: "向前", distance: "鏡子", description: "秀出標誌", cue: "把胸口的 Logo 秀給前面的鏡子看", problem: "上背圓（含胸）" },
+            { id: 17, actionName: "硬舉", category: "下肢拉", direction: "向下", distance: "腋下", description: "擠壓", cue: "想像腋下夾著兩片檸檬，用力擠出汁來", problem: "腋下鬆散（導致圓背）" },
+            { id: 18, actionName: "硬舉", category: "下肢拉", direction: "延伸", distance: "天花板/地板", description: "鋼管", cue: "想像你的軀幹是一根鋼管，頂住天花板與地板", problem: "脊椎支撐無力" },
+            { id: 19, actionName: "硬舉", category: "下肢拉", direction: "旋轉", distance: "槓鈴", description: "折斷", cue: "在槓鈴離地前，先試著把槓鈴折斷", problem: "啟動時背部彈開" },
+            { id: 20, actionName: "硬舉", category: "下肢拉", direction: "向後", distance: "牆壁", description: "指向", cue: "想像你的尾椎是一隻指點桿，指向後方的牆壁", problem: "下背/骨盆控制" },
+            { id: 5, actionName: "羅馬尼亞硬舉", category: "下肢拉", direction: "向後", distance: "後方的牆", description: "撞擊", cue: "臀部向後撞擊想像中的牆，將槓鈴拉離地面", problem: "" },
+            { id: 6, actionName: "單腳硬舉", category: "下肢拉", direction: "向後", distance: "後方的牆", description: "推開", cue: "支撐腳的臀部向後推開牆，懸空腳向後延伸", problem: "" },
+            { id: 7, actionName: "臥推", category: "上肢推", direction: "向上", distance: "天花板", description: "推穿", cue: "將槓鈴向上推穿天花板", problem: "" },
+            { id: 8, actionName: "肩推", category: "上肢推", direction: "向上", distance: "天花板", description: "噴射", cue: "將重量向上噴射到天花板", problem: "" },
+            { id: 9, actionName: "伏地挺身", category: "上肢推", direction: "向下", distance: "地板", description: "推開", cue: "將地板推開，讓身體向上彈起", problem: "" },
+            { id: 10, actionName: "引體向上", category: "上肢拉", direction: "向下", distance: "地板", description: "拉近", cue: "將地板拉向自己，讓身體向上移動", problem: "" },
+            { id: 11, actionName: "划船", category: "上肢拉", direction: "向後", distance: "後方的牆", description: "拉動", cue: "將後方的牆拉向自己", problem: "" },
+            { id: 12, actionName: "下拉", category: "上肢拉", direction: "向下", distance: "地板", description: "撕裂", cue: "將槓鈴向下撕裂，拉向地板", problem: "" },
+            { id: 13, actionName: "死蟲式", category: "旋轉/抗旋轉", direction: "向前", distance: "前方的牆", description: "推開", cue: "對側手腳向前推開前方的牆，保持核心穩定", problem: "" },
+            { id: 14, actionName: "側平板支撐", category: "旋轉/抗旋轉", direction: "向上", distance: "天花板", description: "推高", cue: "將身體向上推高，遠離地板", problem: "" },
+            { id: 15, actionName: "俄式轉體", category: "旋轉/抗旋轉", direction: "側向", distance: "側方的牆", description: "撞擊", cue: "將重量側向撞擊想像中的牆", problem: "" }
+        ];
+
+        let data = [];
+        let currentCategory = '全部';
+        let searchQuery = '';
+
+        async function init() {
+            // Load categories
+            const savedCategories = localStorage.getItem('coachCategories');
+            if (savedCategories) {
+                categories = JSON.parse(savedCategories);
+            } else {
+                categories = defaultCategories.filter(cat => cat !== '全部');
+                saveCategories();
+            }
+
+            // Fetch and Load Data
+            await fetchAndMergeData();
+
+            updateCategoryDropdown();
+            renderCategoryFilters();
+            render();
+
+            // Event Listeners
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    searchQuery = e.target.value.toLowerCase();
+                    render();
+                });
+            }
+
+            const addForm = document.getElementById('addForm');
+            if (addForm) {
+                addForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    saveEntry();
+                });
+            }
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.relative.group')) {
+                    document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                        menu.classList.remove('active');
+                    });
+                }
+            });
+        }
+
+        async function fetchAndMergeData() {
+            let apiData = [];
+            const apiUrl = 'https://script.google.com/macros/s/AKfycbxCzcs3zznNtvBGTGdT2apx56N8NRBKARhDsTfUG9tp45lCfYNFZHLg23AtY7RJuQ7V/exec';
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                apiData = await response.json();
+                console.log('API Data fetched successfully:', apiData);
+            } catch (error) {
+                console.error('API Fetch failed, using fallback data:', error);
+                apiData = [...fallbackData];
+            }
+
+            // LocalStorage Data (User created/modified items)
+            const savedDataStr = localStorage.getItem('coachCueDatabase');
+            let localData = savedDataStr ? JSON.parse(savedDataStr) : [];
+
+            // Merge Strategy:
+            // 1. Start with API data (or fallback)
+            // 2. Identify "custom" items from local storage. 
+            //    Assumption: Items with IDs present in fallbackData but NOT in API are "removed" by source? 
+            //    Simpler Strategy as per request: Merge API data with "existing local added data".
+            //    We will take all API items, and append any local items that have IDs NOT present in API data.
+            //    Also, we might want to respect local "deleted" status if we want to be fancy, but let's stick to basic merge first.
+
+            // Set of API IDs for quick lookup
+            const apiIds = new Set(apiData.map(item => item.id));
+
+            // Filter local data to find items NOT in API (likely user-added items)
+            const userAddedItems = localData.filter(item => !apiIds.has(item.id));
+
+            // Combine
+            data = [...apiData, ...userAddedItems];
+
+            // Migration Only for User Added Items if needed (or re-run on whole set just in case)
+            // Fix "下肢鉸鏈" -> "下肢拉"
+            let migrationNeeded = false;
+
+            // Check Categories migration
+            if (categories.includes('下肢鉸鏈')) {
+                categories = categories.map(c => c === '下肢鉸鏈' ? '下肢拉' : c);
+                categories = [...new Set(categories)];
+                saveCategories();
+            }
+
+            // Check Data migration
+            data.forEach(item => {
+                if (item.category === '下肢鉸鏈') {
+                    item.category = '下肢拉';
+                }
+            });
+
+            // Save merged state to localStorage so offline access works next time with latest data
+            saveData();
+        }
+
+        function renderCategoryFilters() {
+            const container = document.getElementById('categoryFilter');
+            if (!container) return;
+
+            const allCategories = ['全部', ...categories, '已刪除'];
+
+            container.innerHTML = allCategories.map(category => {
+                const isActive = currentCategory === category;
+                const isTrash = category === '已刪除';
+                const isAll = category === '全部';
+
+                let btnClass = isActive
+                    ? 'bg-blue-500 text-white shadow-md ring-2 ring-blue-300'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 active:bg-slate-200';
+
+                if (isTrash) {
+                    btnClass = isActive
+                        ? 'bg-red-500 text-white shadow-md ring-2 ring-red-300'
+                        : 'bg-white text-red-600 hover:bg-red-50 border border-red-200 active:bg-red-100';
+                }
+
+                if (isCategoryEditMode && !isAll && !isTrash) {
+                    return `
+                        <div class="relative group">
+                            <button onclick="filterCategory('${category}')" class="px-4 py-2 rounded-full font-medium transition-all ${btnClass}">
+                                ${category}
+                            </button>
+                            <button onclick="deleteCategory('${category}')" class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-sm font-bold transition-colors shadow-md z-10 border-2 border-white">
+                                ×
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <button onclick="filterCategory('${category}')" class="px-4 py-2 rounded-full font-medium transition-all ${btnClass}">
+                            ${category}
+                        </button>
+                    `;
+                }
+            }).join('');
+
+            const trashControls = document.getElementById('trashControls');
+            if (trashControls) {
+                if (currentCategory === '已刪除') {
+                    trashControls.classList.remove('hidden');
+                } else {
+                    trashControls.classList.add('hidden');
+                }
+            }
+        }
+
+        function filterCategory(category) {
+            currentCategory = category;
+            renderCategoryFilters();
+            render();
+        }
+
+        function render() {
+            const container = document.getElementById('cardsContainer');
+            const emptyState = document.getElementById('emptyState');
+            if (!container || !emptyState) return;
+
+            let filteredData = data.filter(item => {
+                if (currentCategory === '已刪除') {
+                    return item.deleted === true;
+                }
+                if (item.deleted === true) return false;
+
+                const matchesCategory = currentCategory === '全部' || item.category === currentCategory;
+                const matchesSearch = searchQuery === '' ||
+                    item.actionName.toLowerCase().includes(searchQuery) ||
+                    item.cue.toLowerCase().includes(searchQuery) ||
+                    item.direction.toLowerCase().includes(searchQuery) ||
+                    item.distance.toLowerCase().includes(searchQuery) ||
+                    item.description.toLowerCase().includes(searchQuery);
+
+                return matchesCategory && matchesSearch;
+            });
+
+            if (filteredData.length === 0) {
+                container.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+            } else {
+                container.classList.remove('hidden');
+                emptyState.classList.add('hidden');
+            }
+
+            container.innerHTML = filteredData.map(item => {
+                const categoryColors = {
+                    '下肢推': 'from-purple-500 to-pink-500',
+                    '下肢拉': 'from-blue-500 to-cyan-500',
+                    '上肢推': 'from-orange-500 to-red-500',
+                    '上肢拉': 'from-green-500 to-emerald-500',
+                    '旋轉/抗旋轉': 'from-yellow-500 to-amber-500',
+                    '專項(居合/EMT)': 'from-indigo-500 to-purple-500'
+                };
+                const gradient = categoryColors[item.category] || 'from-slate-500 to-slate-600';
+                const isDeleted = item.deleted === true;
+
+                // Click handler for card: copies cue unless a button was clicked
+                const cardClickAttr = isDeleted ? '' : `onclick="handleCardClick(event, '${item.cue.replace(/'/g, "\\'")}')"`;
+                const cursorClass = isDeleted ? '' : 'cursor-pointer active:scale-[0.99]';
+
+                return `
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden border-2 border-slate-200 hover:shadow-lg transition-all relative group flex flex-col h-full ${cursorClass}" ${cardClickAttr}>
+                        <div class="bg-gradient-to-r ${gradient} p-4 pr-14 relative">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-bold text-white break-words pr-2">${item.actionName}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Menu (Top Right) -->
+                        <div class="absolute top-4 right-3 z-20">
+                            <div class="relative group">
+                                <button onclick="toggleMenu(this, event)" class="p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-white transition-colors backdrop-blur-sm">
+                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+                                    </svg>
+                                </button>
+                                <!-- Dropdown -->
+                                <div class="dropdown-menu w-44 py-2 font-medium z-30 shadow-xl rounded-xl">
+                                    ${isDeleted ? `
+                                        <button onclick="restoreEntry(${item.id})" class="block w-full text-left px-4 py-3 text-base text-slate-700 hover:bg-slate-100 flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                                            還原此卡片
+                                        </button>
+                                        <button onclick="permanentDelete(${item.id})" class="block w-full text-left px-4 py-3 text-base text-red-600 hover:bg-red-50 flex items-center gap-3">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            永久刪除
+                                        </button>
+                                    ` : `
+                                        <button onclick="openModal('edit', ${item.id})" class="block w-full text-left px-4 py-3 text-base text-slate-700 hover:bg-slate-100 flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                            編輯
+                                        </button>
+                                        <button onclick="deleteEntry(${item.id})" class="block w-full text-left px-4 py-3 text-base text-red-600 hover:bg-red-50 flex items-center gap-3">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            刪除
+                                        </button>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-4 space-y-4 flex-1 flex flex-col">
+                            <div class="flex items-center">
+                                <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-bold border border-slate-200">
+                                    ${item.category}
+                                </span>
+                            </div>
+                            
+                            <div class="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-100 pointer-events-none">
+                                <div class="text-sm text-slate-700 grid grid-cols-1 gap-1">
+                                    <p><span class="font-semibold text-slate-400">方向：</span> ${item.direction}</p>
+                                    <p><span class="font-semibold text-slate-400">距離：</span> ${item.distance}</p>
+                                    <p><span class="font-semibold text-slate-400">描述：</span> ${item.description}</p>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 border-t border-slate-100 flex justify-between items-start gap-3 mt-auto">
+                                <p class="text-lg text-slate-800 leading-relaxed font-medium flex-1 select-none" id="cue-${item.id}">${item.cue}</p>
+                                <button class="text-slate-400 hover:text-blue-500 transition-colors p-2 -mr-2" title="複製指令">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Handle Card Click (Copy Logic)
+        function handleCardClick(event, text) {
+            // If user clicked a button or link inside the card, do nothing (let that action happen)
+            if (event.target.closest('button') || event.target.closest('.dropdown-menu')) {
+                return;
+            }
+            copyCue(text);
+        }
+
+        function openModal(mode, id = null) {
+            const modal = document.getElementById('entryModal');
+            const title = document.getElementById('modalTitle');
+            const form = document.getElementById('addForm');
+
+            updateCategoryDropdown();
+
+            if (mode === 'add') {
+                title.textContent = '新增指令';
+                form.reset();
+                document.getElementById('entryId').value = '';
+            } else if (mode === 'edit' && id) {
+                title.textContent = '編輯指令';
+                const item = data.find(i => i.id === id);
+                if (item) {
+                    document.getElementById('entryId').value = item.id;
+                    document.getElementById('actionName').value = item.actionName;
+                    document.getElementById('actionCategory').value = item.category;
+                    document.getElementById('direction').value = item.direction;
+                    document.getElementById('distance').value = item.distance;
+                    document.getElementById('description').value = item.description;
+                    document.getElementById('cue').value = item.cue;
+                }
+            }
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('entryModal');
+            modal.classList.remove('active');
+        }
+
+        function handleModalClick(e) {
+            if (e.target.classList.contains('modal-overlay')) {
+                closeModal();
+            }
+        }
+
+        function saveEntry() {
+            const entryId = document.getElementById('entryId').value;
+            const categorySelect = document.getElementById('actionCategory');
+            const category = categorySelect.value;
+
+            if (!category) {
+                alert('請選擇類別');
+                return;
+            }
+
+            const formData = {
+                actionName: document.getElementById('actionName').value.trim(),
+                category: category,
+                direction: document.getElementById('direction').value.trim(),
+                distance: document.getElementById('distance').value.trim(),
+                description: document.getElementById('description').value.trim(),
+                cue: document.getElementById('cue').value.trim(),
+                deleted: false
+            };
+
+            if (entryId) {
+                // Edit Existing
+                const index = data.findIndex(item => item.id == entryId);
+                if (index !== -1) {
+                    data[index] = { ...data[index], ...formData };
+                }
+            } else {
+                // Add New
+                const newEntry = {
+                    id: Date.now(),
+                    ...formData
+                };
+                data.push(newEntry);
+            }
+
+            if (category && !categories.includes(category)) {
+                categories.push(category);
+                saveCategories();
+            }
+
+            saveData();
+            render();
+            closeModal();
+        }
+
+        function toggleMenu(btn, e) {
+            e.stopPropagation();
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                if (menu !== btn.nextElementSibling) menu.classList.remove('active');
+            });
+            const menu = btn.nextElementSibling;
+            if (menu) menu.classList.toggle('active');
+        }
+
+        function deleteEntry(id) {
+            // Close menu first
+            document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.remove('active'));
+            if (confirm('確定要將此卡片移至回收桶嗎？')) {
+                const index = data.findIndex(item => item.id === id);
+                if (index !== -1) {
+                    data[index].deleted = true;
+                    saveData();
+                    render();
+                }
+            }
+        }
+
+        function restoreEntry(id) {
+            // Close menu first
+            document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.remove('active'));
+            const index = data.findIndex(item => item.id === id);
+            if (index !== -1) {
+                data[index].deleted = false;
+                saveData();
+                render();
+                alert('卡片已還原');
+            }
+        }
+
+        function permanentDelete(id) {
+            // Close menu first
+            document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.remove('active'));
+            if (confirm('確定要永久刪除此卡片嗎？此動作無法復原。')) {
+                data = data.filter(item => item.id !== id);
+                saveData();
+                render();
+            }
+        }
+
+        function permanentDeleteAll() {
+            if (confirm('確定要清空回收桶嗎？所有已刪除的卡片將無法復原。')) {
+                data = data.filter(item => item.deleted !== true);
+                saveData();
+                render();
+            }
+        }
+
+        function copyCue(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.add('active');
+                setTimeout(() => {
+                    toast.classList.remove('active');
+                }, 2000);
+            }).catch(err => {
+                console.error('Copy failed', err);
+                alert('複製失敗');
+            });
+        }
+
+        function toggleCategoryEditMode() {
+            isCategoryEditMode = !isCategoryEditMode;
+            const form = document.getElementById('addCategoryForm');
+            const btnText = document.getElementById('editCategoryBtnText');
+            const btn = document.getElementById('editCategoryBtn');
+
+            if (isCategoryEditMode) {
+                form.classList.remove('hidden');
+                btnText.textContent = '完成編輯';
+                btn.classList.add('bg-blue-500', 'text-white', 'hover:bg-blue-600');
+                btn.classList.remove('text-slate-600', 'hover:text-blue-600', 'hover:bg-blue-50');
+            } else {
+                form.classList.add('hidden');
+                btnText.textContent = '編輯分類';
+                btn.classList.remove('bg-blue-500', 'text-white', 'hover:bg-blue-600');
+                btn.classList.add('text-slate-600', 'hover:text-blue-600', 'hover:bg-blue-50');
+            }
+            renderCategoryFilters();
+        }
+
+        function addCategory() {
+            const input = document.getElementById('newCategoryInput');
+            const newCategory = input.value.trim();
+
+            if (!newCategory) {
+                alert('請輸入分類名稱');
+                return;
+            }
+
+            if (categories.includes(newCategory) || newCategory === '已刪除') {
+                alert('此分類已存在或為保留名稱');
+                return;
+            }
+
+            if (newCategory === '全部') {
+                alert('「全部」為保留分類，無法新增');
+                return;
+            }
+
+            categories.push(newCategory);
+            saveCategories();
+            updateCategoryDropdown();
+            renderCategoryFilters();
+            input.value = '';
+        }
+
+        function deleteCategory(category) {
+            const hasData = data.some(item => item.category === category && !item.deleted);
+
+            if (hasData) {
+                const count = data.filter(item => item.category === category && !item.deleted).length;
+                if (!confirm(`此分類下有 ${count} 筆資料，確定要刪除嗎？\n\n注意：刪除後，這些資料的分類將需要手動更新。`)) {
+                    return;
+                }
+            } else {
+                if (!confirm(`確定要刪除分類「${category}」嗎？`)) {
+                    return;
+                }
+            }
+
+            categories = categories.filter(cat => cat !== category);
+            saveCategories();
+            updateCategoryDropdown();
+
+            if (currentCategory === category) {
+                currentCategory = '全部';
+            }
+
+            renderCategoryFilters();
+            render();
+        }
+
+        function updateCategoryDropdown() {
+            const select = document.getElementById('actionCategory');
+            if (!select) return;
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">選擇類別</option>';
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                select.appendChild(option);
+            });
+            if (categories.includes(currentValue)) {
+                select.value = currentValue;
+            }
+        }
+
+        function saveCategories() {
+            localStorage.setItem('coachCategories', JSON.stringify(categories));
+        }
+
+        function saveData() {
+            localStorage.setItem('coachCueDatabase', JSON.stringify(data));
+        }
+
+        function exportData() {
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            const exportFileDefaultName = `coach_cue_db_${new Date().toISOString().slice(0, 10)}.json`;
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        if (confirm(`即將匯入 ${importedData.length} 筆資料，這將會覆蓋目前的資料。確定要繼續嗎？`)) {
+                            data = importedData;
+                            saveData();
+                            const newCategories = [...new Set(data.map(item => item.category))];
+                            categories = ['全部', ...newCategories.filter(c => c !== '全部')];
+                            saveCategories();
+                            updateCategoryDropdown();
+                            renderCategoryFilters();
+                            render();
+                            alert('資料匯入成功！');
+                        }
+                    } else {
+                        alert('檔案格式錯誤：必須是 JSON 陣列');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('無法讀取檔案，請確認格式是否正確');
+                }
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>
